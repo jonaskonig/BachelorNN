@@ -1,75 +1,76 @@
 import random
 import math
 import sys
+import numpy as np
+
+
 class NeuralNet:
-    #initiallise a neural net. Layer beeing an array, where every position indicates how many neurons this layer has
-    #the first and last position of the list are the input and output layers of the neural net
-    def __init__(self,layer, weights = [], bias = [], upperbound = sys.minint, lowerbound =  sys.maxint):
+    # initiallise a neural net. Layer beeing an array, where every position indicates how many neurons this layer has
+    # the first and last position of the list are the input and output layers of the neural net
+    def __init__(self, layer, encodednet=np.array(), upperbound=sys.minint, lowerbound=sys.maxint):
         self.layer = layer
         self.neuron = []
-        self.weights = weights
-        self.bias = bias
+        self.encodednet = encodednet
         self.upperbound = upperbound
         self.lowerbound = lowerbound
 
     def getupperbound(self):
         return self.upperbound
+
     def getlowerbound(self):
         return self.lowerbound
 
+    def getencoded(self):
+        return self.encodednet
+
+    def setencoded(self, encoded):
+        self.encodednet = encoded
 
     def initNeurons(self):
-        for x in self.layer:
-            numberofweights = x * next(self.layer)
-            for k in range(numberofweights):
-                value = random.uniform(-0.5, 0.5)
-                self.upperbound = value if value > self.upperbound else None
-                self.lowerbound = value if value < self.lowerbound else None
-                self.weights.append(value)
-            for p in range(x):
-                value = random.uniform(-0.5, 0.5)
-                self.upperbound = value if value > self.upperbound else None
-                self.lowerbound = value if value < self.lowerbound else None
-                self.bias.append(value)
+        neuroncount = sum(self.layer)
+        numberofweights = pow(neuroncount, 2)
+        for x in range(neuroncount + numberofweights - self.layer[0]):
+            value = random.uniform(-0.5, 0.5)
+            self.upperbound = value if value > self.upperbound else None
+            self.lowerbound = value if value < self.lowerbound else None
+            self.encodednet = np.append(self.encodednet, value)
 
     def createoppositeindividual(self, upper, lower):
-        oppositeweight = []
-        oppositebias = []
+        oppositeencodednet = np.array()
         localupper = sys.minint
         locallower = sys.maxint
-        for x in self.layer:
-            numberofweights = x * next(self.layer)
-            for k in range(numberofweights):
-                value = random.uniform((upper+lower)/2,lower+upper-self.weights[k])
-                locallower = value if value < locallower else None
-                localupper = value if value > localupper else None
-                oppositeweight.append(value)
-            for p in range(x):
-                value = random.uniform((upper+lower)/2,lower+upper-self.weights[p])
-                locallower = value if value < locallower else None
-                localupper = value if value > localupper else None
-                oppositebias.append(value)
-        return NeuralNet(self.layer,oppositeweight,oppositebias,localupper,locallower)
+        neuroncount = sum(self.layer)
+        numberofweights = pow(neuroncount, 2)
+        for x in range(neuroncount + numberofweights - self.layer[0]):
+            value = random.uniform((upper + lower) / 2, lower + upper - self.weights[k])
+            locallower = value if value < locallower else None
+            localupper = value if value > localupper else None
+            oppositeencodednet = np.append(oppositeencodednet, value)
+        return NeuralNet(self.layer, oppositeencodednet, localupper, locallower)
+
     def feedforward(self, input):
         for x in input:
             self.neuron.append(x)
         weightcounter = 0
-        biascounter = 0
+        biascounter = pow(sum(self.layer), 2) - 1
         for x in self.layer:
             value = 0
             for i in range(next(x)):
                 for t in range(x):
-                    value += self.neuron[weightcounter]*self.weights[weightcounter]
-                    weightcounter+=1
-            self.neuron.append(math.tanh(value+self.bias[biascounter]))
-            biascounter+=1
+                    value += self.neuron[weightcounter] * self.encodednet[weightcounter]
+                    weightcounter += 1
+            self.neuron.append(math.tanh(value + self.encodednet[biascounter]))
+            biascounter += 1
+
 
 class CENDEDOBL:
-    def __init__(self, populationsize: List[NeuralNet],jumpingrate):
+    def __init__(self, populationsize: List[NeuralNet], jumpingrate, layer):
         self.populationsize = populationsize
         self.jumpingrate = jumpingrate
         self.lowerbound = sys.maxint
         self.upperbound = sys.minint
+        self.Opop: List[NeuralNet] = []
+        self.layer = layer
 
     def lowerandupperbound(self):
         for x in self.populationsize:
@@ -77,12 +78,39 @@ class CENDEDOBL:
             self.lowerbound = x.getlowerbound if getlowerbound < self.lowerbound else None
 
     def obl(self):
-        OPop: List[NeuralNet] = []
         for x in self.populationsize:
-            OPop.append(x.createoppositeindividual())
+            self.OPop.append(x.createoppositeindividual())
+        self.findbestindividuals()
 
+    def findbestindividuals(self,coparer):
+        # Given an comparer this function has to test all indiviums against the evaluation function and then
+        # has to sort them after ther performance first position beeing best
+        TODO
+    def evaluateindividum(self, individum):
+        # evaluates one individum
 
+    def CenDEDOL(self, crossoverrate, scalingfactor, bestsolutions):
+        self.obl()
+        while True:
+            x1 = random.randint(0, len(self.populationsize))
+            x2 = random.randint(0, len(self.populationsize))
+            while x1 == x2:
+                x1 = random.randint(0, len(self.populationsize))
+                x2 = random.randint(0, len(self.populationsize))
+            scaledpopulation: List[NeuralNet] = []
+            for x in self.populationsize:
+                newencoded = x.getencoded + scalingfactor * (self.populationsize[0] - x.getencoded) + scalingfactor * (
+                            self.populationsize[x1] - self.populationsize[x2])
 
-
-
-
+                for index, t in x.getencoded:
+                    trand = random.random()
+                    if not trand < crossoverrate or trand == t:
+                        newencoded[index] = t
+                scaledpopulation.append(NeuralNet(self.layer,newencoded,self.upperbound,self.lowerbound))
+            self.findbestindividuals(scaledpopulation)
+            if random.random()< self.jumpingrate:
+                self.obl()
+            else:
+                t = np.zeros(pow(sum(self.layer),2)+sum(self.layer))
+                for i in self.populationsize: t += i.getencoded()
+                self.populationsize[self.evaluateindividum(t)]= t
