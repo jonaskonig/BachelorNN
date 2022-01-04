@@ -1,13 +1,15 @@
+import json
 import random
 import math
 import sys
 import numpy as np
+from typing import List
 
 
 class NeuralNet:
     # initiallise a neural net. Layer beeing an array, where every position indicates how many neurons this layer has
     # the first and last position of the list are the input and output layers of the neural net
-    def __init__(self, layer, encodednet=np.array(), upperbound=sys.minint, lowerbound=sys.maxint):
+    def __init__(self, layer, encodednet=np.empty(), upperbound=sys.minint, lowerbound=sys.maxint):
         self.layer = layer
         self.neuron = []
         self.encodednet = encodednet
@@ -64,18 +66,34 @@ class NeuralNet:
 
 
 class CENDEDOBL:
-    def __init__(self, populationsize: List[NeuralNet], jumpingrate, layer):
+    def __init__(self, populationsize: List[NeuralNet], jumpingrate, layer, save = "./"):
         self.populationsize = populationsize
         self.jumpingrate = jumpingrate
         self.lowerbound = sys.maxint
         self.upperbound = sys.minint
         self.Opop: List[NeuralNet] = []
         self.layer = layer
+        self.save = save
+        self.iteration = 0
+
+    def writedata(self):
+        data = {"layer":self.layer,
+                'jumpingrate':self.jumpingrate,
+                "lowerbound":self.lowerbound,
+                "upperbound":self.lowerbound
+                }
+        nets = np.empty()
+        for x in self.populationsize:
+            np.append(nets,x.getencoded())
+        data["individuals"] = nets
+        with open(self.save+str(self.iteration), "w") as outfile:
+            json.dump(data, outfile)
+        self.iteration+=1
 
     def lowerandupperbound(self):
         for x in self.populationsize:
             self.upperbound = x.getupperbound if x.getupperbound > self.upperbound else None
-            self.lowerbound = x.getlowerbound if getlowerbound < self.lowerbound else None
+            self.lowerbound = x.getlowerbound if x.getlowerbound < self.lowerbound else None
 
     def obl(self):
         for x in self.populationsize:
@@ -89,7 +107,7 @@ class CENDEDOBL:
     def evaluateindividum(self, individum):
         # evaluates one individum
 
-    def CenDEDOL(self, crossoverrate, scalingfactor, bestsolutions):
+    def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions):
         self.obl()
         while True:
             x1 = random.randint(0, len(self.populationsize))
@@ -99,8 +117,8 @@ class CENDEDOBL:
                 x2 = random.randint(0, len(self.populationsize))
             scaledpopulation: List[NeuralNet] = []
             for x in self.populationsize:
-                newencoded = x.getencoded + scalingfactor * (self.populationsize[0] - x.getencoded) + scalingfactor * (
-                            self.populationsize[x1] - self.populationsize[x2])
+                newencoded = x.getencoded + scalingfactor * (self.populationsize[0].getencoded() - x.getencoded) + scalingfactor * (
+                            self.populationsize[x1].getencoded() - self.populationsize[x2].getencoded())
 
                 for index, t in x.getencoded:
                     trand = random.random()
@@ -112,5 +130,6 @@ class CENDEDOBL:
                 self.obl()
             else:
                 t = np.zeros(pow(sum(self.layer),2)+sum(self.layer))
-                for i in self.populationsize: t += i.getencoded()
+                for i in range(bestsolutions): t += self.populationsize[i].getencoded()
+                t = NeuralNet(self.layer,t,self.upperbound,self.lowerbound)
                 self.populationsize[self.evaluateindividum(t)]= t
