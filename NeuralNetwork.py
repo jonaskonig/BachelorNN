@@ -6,16 +6,23 @@ import numpy as np
 from typing import List
 
 
+
+
 class NeuralNet:
     # initiallise a neural net. Layer beeing an array, where every position indicates how many neurons this layer has
     # the first and last position of the list are the input and output layers of the neural net
-    def __init__(self, layer, encodednet=np.empty(), upperbound=sys.minint, lowerbound=sys.maxint):
+    def __init__(self, layer, encodednet=np.empty(), upperbound=sys.maxsize, lowerbound=-1*sys.maxsize, boundries = np.empty(2)):
         self.layer = layer
+
+        self.performance = 0
         self.neuron = []
+        self.boundries = boundries
         self.encodednet = encodednet
         self.upperbound = upperbound
         self.lowerbound = lowerbound
 
+    def getperformance(self):
+        return self.performance
     def getupperbound(self):
         return self.upperbound
 
@@ -24,15 +31,19 @@ class NeuralNet:
 
     def getencoded(self):
         return self.encodednet
+    def getperformance(self):
+        return self.performance
 
     def setencoded(self, encoded):
         self.encodednet = encoded
+    def setperfromance(self, performance):
+        self.performance = performance
 
     def initNeurons(self):
         neuroncount = sum(self.layer)
         numberofweights = pow(neuroncount, 2)
         for x in range(neuroncount + numberofweights - self.layer[0]):
-            value = random.uniform(-0.5, 0.5)
+            value = random.uniform(self.boundries[0], self.boundries[1])
             self.upperbound = value if value > self.upperbound else None
             self.lowerbound = value if value < self.lowerbound else None
             self.encodednet = np.append(self.encodednet, value)
@@ -44,11 +55,11 @@ class NeuralNet:
         neuroncount = sum(self.layer)
         numberofweights = pow(neuroncount, 2)
         for x in range(neuroncount + numberofweights - self.layer[0]):
-            value = random.uniform((upper + lower) / 2, lower + upper - self.weights[k])
+            value = random.uniform((upper + lower) / 2, lower + upper - self.encodednet[x])
             locallower = value if value < locallower else None
             localupper = value if value > localupper else None
             oppositeencodednet = np.append(oppositeencodednet, value)
-        return NeuralNet(self.layer, oppositeencodednet, localupper, locallower)
+        return NeuralNet(self.layer, oppositeencodednet, localupper, locallower, self.boundries)
 
     def feedforward(self, input):
         for x in input:
@@ -66,12 +77,12 @@ class NeuralNet:
 
 
 class CENDEDOBL:
-    def __init__(self, populationsize: List[NeuralNet], jumpingrate, layer, save = "./"):
+    def __init__(self, populationsize: List[NeuralNet], jumpingrate, layer, save = "./",evaluationgfunc):
         self.populationsize = populationsize
+        self.evaluationfuc = evaluationgfunc
         self.jumpingrate = jumpingrate
         self.lowerbound = sys.maxint
         self.upperbound = sys.minint
-        self.Opop: List[NeuralNet] = []
         self.layer = layer
         self.save = save
         self.iteration = 0
@@ -82,7 +93,7 @@ class CENDEDOBL:
                 "lowerbound":self.lowerbound,
                 "upperbound":self.lowerbound
                 }
-        nets = np.empty()
+        nets = []
         for x in self.populationsize:
             np.append(nets,x.getencoded())
         data["individuals"] = nets
@@ -96,16 +107,24 @@ class CENDEDOBL:
             self.lowerbound = x.getlowerbound if x.getlowerbound < self.lowerbound else None
 
     def obl(self):
+        OPop: List[NeuralNet] = []
         for x in self.populationsize:
-            self.OPop.append(x.createoppositeindividual())
-        self.findbestindividuals()
+            OPop.append(x.createoppositeindividual(self.lowerbound,self.upperbound))
+        self.findbestindividuals(self.OPop)
 
-    def findbestindividuals(self,coparer):
-        # Given an comparer this function has to test all indiviums against the evaluation function and then
-        # has to sort them after ther performance first position beeing best
-        TODO
+    def sortfunc(self,neuralnet: NeuralNet):
+        return NeuralNet.getperformance(neuralnet)
+
+    def findbestindividuals(self,coparer:List[NeuralNet]):
+        out = self.evaluationfuc([*coparer,*self.populationsize])
+        out.sort(key=self.sortfunc)
+        self.populationsize = out[:len(self.populationsize)]
+
     def evaluateindividum(self, individum):
-        # evaluates one individum
+        out = self.evaluationfuc([individum])
+        self.populationsize.append(out[0])
+        self.populationsize.sort(key=self.sortfunc)
+        del self.populationsize[-1]
 
     def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions):
         self.obl()
@@ -132,4 +151,6 @@ class CENDEDOBL:
                 t = np.zeros(pow(sum(self.layer),2)+sum(self.layer))
                 for i in range(bestsolutions): t += self.populationsize[i].getencoded()
                 t = NeuralNet(self.layer,t,self.upperbound,self.lowerbound)
-                self.populationsize[self.evaluateindividum(t)]= t
+                self.evaluateindividum(t)
+
+
