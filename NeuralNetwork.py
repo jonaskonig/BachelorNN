@@ -11,9 +11,8 @@ from typing import List
 class NeuralNet:
     # initiallise a neural net. Layer beeing an array, where every position indicates how many neurons this layer has
     # the first and last position of the list are the input and output layers of the neural net
-    def __init__(self, layer, encodednet=np.empty(), upperbound=sys.maxsize, lowerbound=-1*sys.maxsize, boundries = np.empty(2)):
+    def __init__(self, layer: List, encodednet=np.empty(0), upperbound=sys.maxsize, lowerbound=-1 * sys.maxsize, boundries = np.empty(2)):
         self.layer = layer
-
         self.performance = 0
         self.neuron = []
         self.boundries = boundries
@@ -38,6 +37,17 @@ class NeuralNet:
         self.encodednet = encoded
     def setperfromance(self, performance):
         self.performance = performance
+
+    # reduces the deminesion of the neual network
+    # to allow tweeking of importance from differnt demensions, these neurons have the possiblility to tweek the bias
+    # for each demension, while the weight is staying the same
+    def reducedeminesion(self, input, bias):
+        out = 0
+        for x, y in zip(input,bias):
+            out += input*bias
+        return out
+
+
 
     def initNeurons(self):
         neuroncount = sum(self.layer)
@@ -77,7 +87,7 @@ class NeuralNet:
 
 
 class CENDEDOBL:
-    def __init__(self, populationsize: List[NeuralNet], jumpingrate, layer, save = "./",evaluationgfunc):
+    def __init__(self, populationsize: List[NeuralNet], jumpingrate, layer, evaluationgfunc ,save: str = "./"):
         self.populationsize = populationsize
         self.evaluationfuc = evaluationgfunc
         self.jumpingrate = jumpingrate
@@ -115,10 +125,14 @@ class CENDEDOBL:
     def sortfunc(self,neuralnet: NeuralNet):
         return NeuralNet.getperformance(neuralnet)
 
-    def findbestindividuals(self,coparer:List[NeuralNet]):
-        out = self.evaluationfuc([*coparer,*self.populationsize])
-        out.sort(key=self.sortfunc)
-        self.populationsize = out[:len(self.populationsize)]
+    def findbestindividuals(self,coparer:List[NeuralNet], onebyone = False):
+        out = self.evaluationfuc([*self.populationsize, *coparer])
+        if onebyone:
+            for x in range(len(self.populationsize)):
+                self.populationsize[i] = out[x] if out[x].getperformance > out[len(self.populationsize)+x].getperformance else out[len(self.populationsize)+x]
+        else:
+            out.sort(key=self.sortfunc)
+            self.populationsize = out[:len(self.populationsize)]
 
     def evaluateindividum(self, individum):
         out = self.evaluationfuc([individum])
@@ -144,7 +158,7 @@ class CENDEDOBL:
                     if not trand < crossoverrate or trand == t:
                         newencoded[index] = t
                 scaledpopulation.append(NeuralNet(self.layer,newencoded,self.upperbound,self.lowerbound))
-            self.findbestindividuals(scaledpopulation)
+            self.findbestindividuals(scaledpopulation, True)
             if random.random()< self.jumpingrate:
                 self.obl()
             else:
