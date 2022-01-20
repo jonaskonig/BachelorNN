@@ -14,9 +14,9 @@ class communicator:
                                     socket.SOCK_DGRAM)  # UDP
         self.socket.bind(("", self.port))
 
-    def sendwelcome(self):
+    def sendwelcome(self, address):
         startstatement = "Begin"
-        self.socket.sendto(startstatement, "localhost")
+        self.socket.sendto(startstatement, address)
         while True:
             try:
                 data, addr = self.socket.recvfrom(1024)
@@ -27,12 +27,16 @@ class communicator:
         while True:
             try:
                 data, addr = self.socket.recvfrom(1024)
+                if int(data) == 0:
+                    break
                 data, addr = self.socket.recvfrom(int(data))
-
+                steering = self.neuralnet.neuralnet(self.imagetoposition(data))
+                self.socket.sendto(steering[0],address)
+                self.socket.sendto(steering[1], address)
             except socket.error:
                 pass
 
-    def imagetoposition(self, image: bytearray):
+    def imagetoposition(self, image: bytes):
 
         img = cv2.imread(np.asarray(image, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
         height, width, _ = img.shape

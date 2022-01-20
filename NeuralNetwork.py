@@ -101,13 +101,18 @@ class NeuralNet:
 
     def neuralnet(self, input: List[List]):
         threds = list()
-        for t in range(len(input)):
-            x = threading.Thread(target=self.feedforward, args=(input[t], self.layer[0], t))
-            threds.append(x)
-            x.start()
+        index = 0
+        for p in input:
+            for t in p:
+                x = threading.Thread(target=self.feedforward, args=(input[t], self.layer[0], index))
+                index += 1
+                threds.append(x)
+                x.start()
         for t in threds:
             t.join()
-        newinput = sum(self.neuron)
+        newinput = np.empty(0)
+        for x in range(0, index, len(input)):
+            newinput = np.append(newinput,sum(self.neuron[x:x+len(input)]))
         self.feedforward(newinput, self.layer[1], self.offset, 0)
         return self.neuron[0]
 
