@@ -7,7 +7,7 @@ import NeuralNetwork
 
 
 class communicator:
-    def __init__(self, port: int, neuralnet: NeuralNetwork):
+    def __init__(self, port: int, recport: int, neuralnet: NeuralNetwork):
         self.port = port
         self.neuralnet = neuralnet
         self.socket = socket.socket(socket.AF_INET,  # Internet
