@@ -10,9 +10,9 @@ import time
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    neuralnet = [[4, 3, 4], [4, 3, 4], [4, 3, 4], [12, 4, 5, 3, 2]]
+    neuralnet = [[4, 3, 4], [4, 3, 4], [4, 3, 4], [12, 4, 3, 2]]
     neuralneta = []
-    botsize = 15
+    botsize = 30
     port = 9653
    # mana = Manager.CommunicationManager(port, "127.0.0.1", botsize)
    # port += 4
@@ -26,6 +26,7 @@ if __name__ == '__main__':
     #t = neuralneta[0].createoppositeindividual(1,-1)
     #print(len(t.getencoded()))
     cendobl = NeuralNetwork.CENDEDOBL(neuralneta,0.3,30,neuralnet,port,15)
+    cendobl.readindata("./26.json")
     cendobl.CenDEDOL(0.9,0.5,3)
     #time.sleep(30)
    # print("stopping")

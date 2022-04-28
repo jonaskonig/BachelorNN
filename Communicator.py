@@ -17,9 +17,10 @@ class Communicator:
         self.dataready = False
         self.datatobesend: str = ""
         self.sender = threading.Thread(target=self.sender)
-        self.receiver = threading.Thread(target=self.receiver)
+        self.receiver =   threading.Thread(target=self.receiver)
         self.sender.start()
         self.receiver.start()
+
     def setstoprunning(self):
         self.running = False
 
@@ -47,9 +48,7 @@ class Communicator:
                     continue
                 if msg == bytes("ZuEndekleinerHase", 'utf-8'):
                     begon = False
-
                     self.imagetoposition(bytearray(pic))
-
                     continue
                 if begon:
                     pic += msg
@@ -58,14 +57,14 @@ class Communicator:
 
     def sender(self):
         sock = socket(AF_INET, SOCK_DGRAM)
-        sock.bind((self.address, self.port+1))
+        sock.bind((self.address, self.port + 1))
         while True:
             if not self.running:
                 sock.sendto(bytes("ENDREG", "utf-8"), (self.address, self.port + 2))
                 break
             if self.dataready:
                 sock.sendto(bytes(self.datatobesend, "utf-8"), (self.address, self.port + 2))
-                #print(f"senddata {self.datatobesend}")
+                # print(f"senddata {self.datatobesend}")
                 self.dataready = False
 
     def imagetoposition(self, image: bytes):

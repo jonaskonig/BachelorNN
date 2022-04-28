@@ -69,9 +69,9 @@ class CommunicationManager:
                 #    continue
                 #if msg == bytes("RESULTEND", 'utf-8'):
 
-                results += msg.decode('utf-8')
+                results = msg.decode('utf-8')
                 results = results.split(";")
-                self.results = np.array(results).astype(np.float)
+                self.results = np.array(results).astype(float)
                 self.resultsarethere = True
 
             except:

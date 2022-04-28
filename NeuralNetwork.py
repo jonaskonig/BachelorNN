@@ -177,7 +177,7 @@ class CENDEDOBL:
         data = {"layer": self.layer,
                 'jumpingrate': self.jumpingrate,
                 "lowerbound": self.lowerbound,
-                "upperbound": self.lowerbound
+                "upperbound": self.upperbound
                 }
         nets = []
         performance = []
@@ -189,7 +189,7 @@ class CENDEDOBL:
         data["individuals"] = nets
         data["performance"] = performance
         data["boundries"] = boundries
-        with open(self.save + str(self.iteration), "w") as outfile:
+        with open(self.save + str(self.iteration)+".json", "w") as outfile:
             json.dump(data, outfile)
         self.iteration += 1
 
@@ -203,16 +203,19 @@ class CENDEDOBL:
         individual = data["individuals"]
         boundries = data["boundries"]
         self.populationsize = []
-        for indi, perfo, bound in individual, performance, boundries:
+
+        for x in range(len(individual)):
             self.populationsize.append(
-                NeuralNet(self.layer, np.array(indi), upperbound=bound[0], lowerbound=bound[1], performance=perfo))
+                NeuralNet(self.layer, np.array(individual[x]), upperbound=boundries[x][0], lowerbound=boundries[x][1], performance=performance[x]))
 
     def lowerandupperbound(self):
         for x in self.populationsize:
             self.upperbound = x.getupperbound() if x.getupperbound() > self.upperbound else self.upperbound
             self.lowerbound = x.getlowerbound() if x.getlowerbound() < self.lowerbound else self.lowerbound
+        print(f"self upper {self.upperbound} self lower {self.lowerbound}")
 
     def obl(self):
+        self.lowerandupperbound()
         o_pop: List[NeuralNet] = []
         for x in self.populationsize:
             o_pop.append(x.createoppositeindividual(self.lowerbound, self.upperbound))
@@ -253,6 +256,7 @@ class CENDEDOBL:
                 print("Waitingforresults")
                 #    time.sleep(1)
                 results = self.manager.getresults()
+            print(results)
             x = 0
             for res in range(len(results), 0, -1):
                 coparer[counter - res].setperfromance(results[x])
@@ -263,8 +267,11 @@ class CENDEDOBL:
                     x].getperformance() else self.populationsize[x]
         else:
             print("comparing")
-            coparer.sort(key=self.sortfunc, reverse=True)
-            self.populationsize = coparer[:len(self.populationsize)]
+            orgleng = len(self.populationsize)
+            self.populationsize.extend(coparer)
+            self.populationsize.sort(key=self.sortfunc, reverse=True)
+            self.populationsize = self.populationsize[:orgleng]
+        time.sleep(1)
 
     def evaluateindividum(self, individum: NeuralNet):
         self.manager.setbotcount(1)
@@ -272,6 +279,9 @@ class CENDEDOBL:
         t = Communicator.Communicator(self.startport, self.address, individum)
         time.sleep(self.runtime)
         self.manager.setstop()
+        print("setstop")
+        t.setstoprunning()
+        t.stopthread()
         t.running = False
         del t
         results = False
@@ -279,10 +289,17 @@ class CENDEDOBL:
             print("waiting for results")
             results = self.manager.checkresults()
         results = self.manager.getresults()
+        while results is None:
+            #     self.manager.askforresult()
+            print("Waitingforresults")
+            #    time.sleep(1)
+            results = self.manager.getresults()
+        print(results)
         individum.setperfromance(results[0])
         self.populationsize.append(individum)
         self.populationsize.sort(key=self.sortfunc, reverse=True)
         del self.populationsize[-1]
+        time.sleep(1)
 
     def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions):
         print(len(self.populationsize[0].getencoded()))
@@ -300,6 +317,7 @@ class CENDEDOBL:
                 x1 = random.randint(0, len(self.populationsize) - 1)
                 x2 = random.randint(0, len(self.populationsize) - 1)
             scaledpopulation: List[NeuralNet] = []
+            self.lowerandupperbound()
             for x in self.populationsize:
                 scal1 = (scalingfactor * (
                         self.populationsize[0].getencoded() - x.getencoded()))
@@ -313,11 +331,13 @@ class CENDEDOBL:
                     if not trand < crossoverrate or trand == t:
                         newencoded[index] = t
                     index += 1
+
                 scaledpopulation.append(NeuralNet(self.layer, newencoded, self.upperbound, self.lowerbound))
             self.findbestindividuals(scaledpopulation, True)
             if random.random() < self.jumpingrate:
                 self.obl()
             else:
+                self.lowerandupperbound()
                 t = NeuralNet(self.layer, upperbound=self.upperbound, lowerbound=self.lowerbound)
                 t.initvalues()
                 net = t.getencoded()
