@@ -1,9 +1,11 @@
 import sys
-from socket import socket, AF_INET, SOCK_DGRAM
+import time
+from socket import socket, AF_INET, SOCK_DGRAM, SO_SNDBUF, SOL_SOCKET
 import numpy as np
 import cv2
 import threading
 import NeuralNetwork
+import multiprocessing
 
 
 class Communicator:
@@ -14,35 +16,56 @@ class Communicator:
         self.running = True
         self.dataready = False
         self.datatobesend: str = ""
-        sender = threading.Thread(target=self.sender())
-        receiver = threading.Thread(target=self.receiver())
-        sender.start()
-        receiver.start()
+        self.sender = threading.Thread(target=self.sender)
+        self.receiver = threading.Thread(target=self.receiver)
+        self.sender.start()
+        self.receiver.start()
+    def setstoprunning(self):
+        self.running = False
+
+    def stopthread(self):
+        self.sender.join()
+        self.receiver.join()
 
     def receiver(self):
         sock = socket(AF_INET, SOCK_DGRAM)
+        sock.setsockopt(SOL_SOCKET, SO_SNDBUF, 17308)
         sock.bind((self.address, self.port + 3))
+        sock.settimeout(5)
         pic = []
+        begon = False
         while True:
-            if self.running:
+            if not self.running:
                 break
-            msg, addr = sock.recvfrom(8654)  # This is the amount of bytes to read at maximum
-            if msg == bytes("LosGehtsKleinerHase", 'utf-8'):
-                pic = []
-                continue
-            if msg == bytes("ZuEndekleinerHase", 'utf-8'):
-                print(self.imagetoposition(bytearray(pic)))
-                continue
-            pic += msg
+            try:
+                msg, addr = sock.recvfrom(8654)  # This is the amount of bytes to read at maximum
+                if msg == bytes("ENDOFGAME", 'utf-8'):
+                    break
+                if msg == bytes("LosGehtsKleinerHase", 'utf-8'):
+                    pic = []
+                    begon = True
+                    continue
+                if msg == bytes("ZuEndekleinerHase", 'utf-8'):
+                    begon = False
+
+                    self.imagetoposition(bytearray(pic))
+
+                    continue
+                if begon:
+                    pic += msg
+            except Exception as e:
+                print(e)
 
     def sender(self):
         sock = socket(AF_INET, SOCK_DGRAM)
-        sock.bind((self.address, self.port + 1))
+        sock.bind((self.address, self.port+1))
         while True:
-            if self.running:
+            if not self.running:
+                sock.sendto(bytes("ENDREG", "utf-8"), (self.address, self.port + 2))
                 break
             if self.dataready:
                 sock.sendto(bytes(self.datatobesend, "utf-8"), (self.address, self.port + 2))
+                #print(f"senddata {self.datatobesend}")
                 self.dataready = False
 
     def imagetoposition(self, image: bytes):
@@ -88,5 +111,6 @@ class Communicator:
                 (x, y, w, h) = cv2.boundingRect(cnt)
                 bound = np.asarray([x, y, w, h])
                 bandreg.append(bound)
-
-        return [redreq, bluereg, bandreg]
+        t = self.neuralnet.neuralnet([redreq, bluereg, bandreg])
+        self.datatobesend = ';'.join(str(x) for x in t)
+        self.dataready = True

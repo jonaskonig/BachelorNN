@@ -12,13 +12,15 @@ class CommunicationManager:
         self.results = None
         self.running = False
         self.botcount = botcount
-        self.changedbotcount = False
+        self.changedbotcount = True
+        self.newresultpls = False
         self.shuffle = False
         self.eog = False
         self.start = False
         self.resultsarethere = False
-        self.sender = threading.Thread(target=self.sender())
-        self.receiver = threading.Thread(target=self.reveiver())
+        self.sender = threading.Thread(target=self.sender)
+        self.receiver = threading.Thread(target=self.reciver)
+        self.startcommunication()
         self.botlist = []
 
     def setbotcount(self, count):
@@ -37,6 +39,9 @@ class CommunicationManager:
     def setstop(self):
         self.eog = True
 
+    def askforresult(self):
+        self.newresultpls = True
+
     def setshuffle(self):
         self.shuffle = True
 
@@ -49,38 +54,49 @@ class CommunicationManager:
 
     def reciver(self):
         sock = socket(AF_INET, SOCK_DGRAM)
-        sock.bind((self.address, self.port + 1))
+        sock.bind((self.address, self.port + 3))
+        sock.settimeout(5)
         results = ""
         resultsevent = False
         while True:
             if self.running:
                 break
-            msg, addr = sock.recvfrom(8654)  # This is the amount of bytes to read at maximum
-            if msg == bytes("RESULTSTART", 'utf-8'):
-                resultsevent = True
-                results = ""
-                continue
-            if msg == bytes("RESULTEND", 'utf-8'):
-                resultsevent = False
+            try:
+                msg, addr = sock.recvfrom(8654)  # This is the amount of bytes to read at maximum
+                #if msg == bytes("RESULTSTART", 'utf-8'):
+                #    resultsevent = True
+                #    results = ""
+                #    continue
+                #if msg == bytes("RESULTEND", 'utf-8'):
+
+                results += msg.decode('utf-8')
                 results = results.split(";")
                 self.results = np.array(results).astype(np.float)
                 self.resultsarethere = True
-                results = ""
-                continue
-            if resultsevent:
-                results += msg.decode('utf-8')
+
+            except:
+                pass
 
     def sender(self):
         sock = socket(AF_INET, SOCK_DGRAM)
-        sock.bind((self.address, self.port + 3))
+        sock.bind((self.address, self.port + 1))
         while True:
             if self.running:
                 break
             if self.shuffle:
                 sock.sendto(bytes("SHUFFLE", "utf-8"), (self.address, self.port + 2))
+                self.shuffle = False
             if self.start:
+                print("sendstart")
                 sock.sendto(bytes("START", "utf-8"), (self.address, self.port + 2))
+                self.start = False
             if self.changedbotcount:
-                sock.sendto(bytes(str(self.botcount), "utf-8"), (self.address, self.port + 2))
+                sock.sendto(bytes("BOTCOUNT;" + str(self.botcount), "utf-8"), (self.address, self.port + 2))
+                self.changedbotcount = False
             if self.eog:
                 sock.sendto(bytes("EOG", "utf-8"), (self.address, self.port + 2))
+                self.eog = False
+            if self.newresultpls:
+                sock.sendto(bytes("GETRESULT", "utf-8"), (self.address, self.port + 2))
+                print("askingagain")
+                self.newresultpls = False

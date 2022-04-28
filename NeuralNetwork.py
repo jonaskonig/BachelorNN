@@ -14,17 +14,16 @@ import Manager
 class NeuralNet:
     # initiallise a neural net. Layer beeing an array, where every position indicates how many neurons this layer has
     # the first and last position of the list are the input and output layers of the neural net
-    def __init__(self, layer: List[List], encodednet=np.empty(0), upperbound=sys.maxsize, lowerbound=-1 * sys.maxsize,
-                 boundries=np.empty(2)):
+    def __init__(self, layer: List[List], encodednet=np.empty(0), upperbound=1, lowerbound=-1, performance=None):
         self.layer = layer
         self.Neuralnetlengh = self.caculatelnght()
         self.offset = self.calcoffset()
-        self.performance = None
+        self.performance = performance
         self.neuron = []
-        self.boundries = boundries
+
         self.encodednet = encodednet
         self.endsofnns = self.setends()
-        if len(encodednet)>0:
+        if len(encodednet) > 0:
             self.calculatelowerandupperbound()
         else:
             self.upperbound = upperbound
@@ -46,11 +45,12 @@ class NeuralNet:
         for nn in self.layer:
             lenngh += sum(nn[1:])
             for i in range(len(nn)):
-                if i+1 == len(nn):
+                if i + 1 == len(nn):
                     continue
-                lenngh += nn[i]*nn[i+1]
-        self.encodednet = np.random.randint(self.lowerbound, self.upperbound, size=lenngh)
+                lenngh += nn[i] * nn[i + 1]
+        self.encodednet = np.random.uniform(low=self.lowerbound, high=self.upperbound, size=lenngh)
         self.calculatelowerandupperbound()
+        print(len(self.encodednet))
 
     def setends(self):
         begins = []
@@ -61,8 +61,8 @@ class NeuralNet:
                 if i + 1 == len(nn):
                     continue
                 lenngh += nn[i] * nn[i + 1]
-            if len(begins)>0:
-                begins.append(begins[-1]+lenngh)
+            if len(begins) > 0:
+                begins.append(begins[-1] + lenngh)
             else:
                 begins.append(lenngh)
         return begins
@@ -99,25 +99,25 @@ class NeuralNet:
         return out
 
     def createoppositeindividual(self, upper, lower):
-        oppositeencodednet = np.array(0)
+        oppositeencodednet = np.empty(0)
         for x in self.encodednet:
             value = random.uniform((upper + lower) / 2, lower + upper - x)
             oppositeencodednet = np.append(oppositeencodednet, value)
-        return NeuralNet(self.layer, oppositeencodednet, boundries=self.boundries)
+        return NeuralNet(self.layer, oppositeencodednet, upperbound=self.lowerbound, lowerbound=self.lowerbound)
 
     def feedforward(self, input, layer: List, index, offset=0):
         neuron = []
         for x in input:
             neuron.append(x)
-        if offset==0:
+        if offset == 0:
             weightcounter = 0
         else:
-            weightcounter = self.endsofnns[offset-1]+1
-        biascounter = self.endsofnns[offset]-sum(layer[1:])
+            weightcounter = self.endsofnns[offset - 1] + 1
+        biascounter = self.endsofnns[offset] - sum(layer[1:])
         neuroncounter = 0
         for x in range(len(layer)):
             value = 0
-            if x+1 < len(layer):
+            if x + 1 < len(layer):
                 for i in range(layer[x + 1]):
                     for t in range(layer[x]):
                         value += neuron[neuroncounter] * self.encodednet[weightcounter]
@@ -125,7 +125,7 @@ class NeuralNet:
                 neuroncounter += 1
                 neuron.append(math.tanh(value + self.encodednet[biascounter]))
                 biascounter += 1
-        self.neuron[index] = np.array(neuron[:layer[-1]])
+        self.neuron[index] = np.array(neuron[-layer[-1]:])
 
     def neuralnet(self, input: List[List]):
         threds = list()
@@ -137,27 +137,32 @@ class NeuralNet:
                 self.neuron.append(0)
                 x = threading.Thread(target=self.feedforward, args=(t, self.layer[nnposition], index, nnposition))
                 index += 1
-                threds.append(x)
                 x.start()
+                threds.append(x)
             nnposition += 1
         for t in threds:
             t.join()
         newinput = np.empty(0)
-        for x in range(0, index, len(input)):
-            newinput = np.append(newinput, sum(self.neuron[x:x + len(input)]))
-        self.feedforward(newinput, self.layer[nnposition], 0,nnposition)
+        inputcounter = 0
+        for x in input:
+            temparray = np.empty(len(self.neuron[0]))
+            for t in range(inputcounter, len(x)):
+                temparray += self.neuron[t]
+            inputcounter += len(x) - 1
+            newinput = np.concatenate((newinput, temparray))
+        self.feedforward(newinput, self.layer[nnposition], 0, nnposition)
         return self.neuron[0]
 
 
 class CENDEDOBL:
     def __init__(self, populationsize: List[NeuralNet], jumpingrate, runtime, layer, startport, chunksize,
                  save: str = "./",
-                 address="127.0.0..1"):
+                 address="127.0.0.1"):
         self.populationsize = populationsize
         self.jumpingrate = jumpingrate
-        self.lowerbound = sys.maxint
+        self.lowerbound = 1
         self.runtime = runtime
-        self.upperbound = sys.minint
+        self.upperbound = -1
         self.startport = startport
         self.layer = layer
         self.save = save
@@ -165,6 +170,7 @@ class CENDEDOBL:
         self.iteration = 0
         self.address = address
         self.manager = Manager.CommunicationManager(self.startport, self.address, self.chunksize)
+        self.manager.setshuffle()
         self.startport += 4
 
     def writedata(self):
@@ -174,17 +180,37 @@ class CENDEDOBL:
                 "upperbound": self.lowerbound
                 }
         nets = []
+        performance = []
+        boundries = []
         for x in self.populationsize:
-            np.append(nets, x.getencoded())
+            nets.append(x.getencoded().tolist())
+            performance.append(x.getperformance())
+            boundries.append([x.getupperbound(), x.getlowerbound()])
         data["individuals"] = nets
+        data["performance"] = performance
+        data["boundries"] = boundries
         with open(self.save + str(self.iteration), "w") as outfile:
             json.dump(data, outfile)
         self.iteration += 1
 
+    def readindata(self, filename: str):
+        data = json.load(open(filename))
+        self.layer = data['layer']
+        self.jumpingrate = data['jumpingrate']
+        self.lowerbound = data['lowerbound']
+        self.upperbound = data['upperbound']
+        performance = data["performance"]
+        individual = data["individuals"]
+        boundries = data["boundries"]
+        self.populationsize = []
+        for indi, perfo, bound in individual, performance, boundries:
+            self.populationsize.append(
+                NeuralNet(self.layer, np.array(indi), upperbound=bound[0], lowerbound=bound[1], performance=perfo))
+
     def lowerandupperbound(self):
         for x in self.populationsize:
-            self.upperbound = x.getupperbound if x.getupperbound > self.upperbound else None
-            self.lowerbound = x.getlowerbound if x.getlowerbound < self.lowerbound else None
+            self.upperbound = x.getupperbound() if x.getupperbound() > self.upperbound else self.upperbound
+            self.lowerbound = x.getlowerbound() if x.getlowerbound() < self.lowerbound else self.lowerbound
 
     def obl(self):
         o_pop: List[NeuralNet] = []
@@ -197,81 +223,105 @@ class CENDEDOBL:
 
     def findbestindividuals(self, coparer: List[NeuralNet], onebyone=False):
         counter = 0
-        currentactiveingame = list
         while counter < len(coparer):
             startport = self.startport
+            currentactiveingame = []
             if len(coparer) - counter > self.chunksize:
+                self.manager.setbotcount(self.chunksize)
+                self.manager.setstart()
                 for x in range(self.chunksize):
                     currentactiveingame.append(Communicator.Communicator(startport, self.address, coparer[counter]))
                     counter += 1
                     startport += 4
             else:
                 self.manager.setbotcount(len(coparer) - counter)
+                self.manager.setstart()
                 for x in range(len(coparer) - counter):
                     currentactiveingame.append(Communicator.Communicator(startport, self.address, coparer[counter]))
                     counter += 1
                     startport += 4
-                self.manager.setstart()
-                time.sleep(self.runtime)
-                self.manager.setstop()
-                del currentactiveingame
-                results = False
-                while not results:
-                    results = self.manager.checkresults()
+            time.sleep(self.runtime)
+            self.manager.setstop()
+            print("setstop")
+            for active in currentactiveingame:
+                active.setstoprunning()
+            for active in currentactiveingame:
+                active.stopthread()
+            results = self.manager.getresults()
+            while results is None:
+                #     self.manager.askforresult()
+                print("Waitingforresults")
+                #    time.sleep(1)
                 results = self.manager.getresults()
-                x = 0
-                for res in range(len(results), 0, -1):
-                    coparer[counter - res].setperfromance(results[x])
-                    x += 1
+            x = 0
+            for res in range(len(results), 0, -1):
+                coparer[counter - res].setperfromance(results[x])
+                x += 1
         if onebyone:
-            for x in range(len(self.populationsize)):
-                self.populationsize[x] = coparer[x] if coparer[x].getperformance > coparer[
-                    len(self.populationsize) + x].getperformance else coparer[len(self.populationsize) + x]
+            for x in range(len(self.populationsize) - 1):
+                self.populationsize[x] = coparer[x] if coparer[x].getperformance() > self.populationsize[
+                    x].getperformance() else self.populationsize[x]
         else:
-            coparer.sort(key=self.sortfunc)
+            print("comparing")
+            coparer.sort(key=self.sortfunc, reverse=True)
             self.populationsize = coparer[:len(self.populationsize)]
 
     def evaluateindividum(self, individum: NeuralNet):
         self.manager.setbotcount(1)
-        t = Communicator.Communicator(self.startport, self.address, individum)
         self.manager.setstart()
+        t = Communicator.Communicator(self.startport, self.address, individum)
         time.sleep(self.runtime)
         self.manager.setstop()
         t.running = False
         del t
         results = False
         while not results:
+            print("waiting for results")
             results = self.manager.checkresults()
         results = self.manager.getresults()
         individum.setperfromance(results[0])
         self.populationsize.append(individum)
-        self.populationsize.sort(key=self.sortfunc)
+        self.populationsize.sort(key=self.sortfunc, reverse=True)
         del self.populationsize[-1]
 
     def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions):
+        print(len(self.populationsize[0].getencoded()))
+        self.findbestindividuals(self.populationsize)
+        print(len(self.populationsize[0].getencoded()))
         self.obl()
+        print(len(self.populationsize[0].getencoded()))
         while True:
-            x1 = random.randint(0, len(self.populationsize))
-            x2 = random.randint(0, len(self.populationsize))
+            self.lowerandupperbound()
+            self.writedata()
+            self.manager.setshuffle()
+            x1 = random.randint(0, len(self.populationsize) - 1)
+            x2 = random.randint(0, len(self.populationsize) - 1)
             while x1 == x2:
-                x1 = random.randint(0, len(self.populationsize))
-                x2 = random.randint(0, len(self.populationsize))
+                x1 = random.randint(0, len(self.populationsize) - 1)
+                x2 = random.randint(0, len(self.populationsize) - 1)
             scaledpopulation: List[NeuralNet] = []
             for x in self.populationsize:
-                newencoded = x.getencoded() + scalingfactor * (
-                        self.populationsize[0].getencoded() - x.getencoded) + scalingfactor * (
-                                     self.populationsize[x1].getencoded() - self.populationsize[x2].getencoded())
+                scal1 = (scalingfactor * (
+                        self.populationsize[0].getencoded() - x.getencoded()))
+                scal2 = (scalingfactor * (
+                        self.populationsize[x1].getencoded() - self.populationsize[x2].getencoded()))
+                newencoded = x.getencoded() + scal1 + scal2
 
-                for index, t in x.getencoded():
+                index = 0
+                for t in x.getencoded():
                     trand = random.random()
                     if not trand < crossoverrate or trand == t:
                         newencoded[index] = t
+                    index += 1
                 scaledpopulation.append(NeuralNet(self.layer, newencoded, self.upperbound, self.lowerbound))
             self.findbestindividuals(scaledpopulation, True)
             if random.random() < self.jumpingrate:
                 self.obl()
             else:
-                t = np.zeros(pow(sum(self.layer), 2) + sum(self.layer))
-                for i in range(bestsolutions): t += self.populationsize[i].getencoded()
-                t = NeuralNet(self.layer, t, self.upperbound, self.lowerbound)
+                t = NeuralNet(self.layer, upperbound=self.upperbound, lowerbound=self.lowerbound)
+                t.initvalues()
+                net = t.getencoded()
+                for i in range(bestsolutions):
+                    net += self.populationsize[i].getencoded()
+                t = NeuralNet(self.layer, net / bestsolutions, upperbound=self.upperbound, lowerbound=self.lowerbound)
                 self.evaluateindividum(t)
