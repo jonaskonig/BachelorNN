@@ -98,10 +98,10 @@ class NeuralNet:
             out += input * bias
         return out
 
-    def createoppositeindividual(self, upper, lower):
+    def createoppositeindividual(self):
         oppositeencodednet = np.empty(0)
         for x in self.encodednet:
-            value = random.uniform((upper + lower) / 2, lower + upper - x)
+            value = random.uniform((self.upperbound + self.lowerbound) / 2, self.lowerbound + self.upperbound - x)
             oppositeencodednet = np.append(oppositeencodednet, value)
         return NeuralNet(self.layer, oppositeencodednet, upperbound=self.lowerbound, lowerbound=self.lowerbound)
 
@@ -122,32 +122,43 @@ class NeuralNet:
                     for t in range(layer[x]):
                         value += neuron[neuroncounter] * self.encodednet[weightcounter]
                         weightcounter += 1
-                neuroncounter += 1
-                neuron.append(math.tanh(value + self.encodednet[biascounter]))
-                biascounter += 1
-        self.neuron[index] = np.array(neuron[-layer[-1]:])
+                    neuroncounter += 1
+                    neuron.append(math.tanh(value + self.encodednet[biascounter]))
+                    biascounter += 1
+        #try:
+        return neuron[-layer[-1]:]
+        #except Exception as e:
+        #    print(e)
+         #   print(f"Index is: {index} and lenght is: {len(self.neuron)}")
 
-    def neuralnet(self, input: List[List]):
-        threds = list()
+    def neuralnet(self, inputdata: List[List]):
         index = 0
         nnposition = 0
+        arraylen = sum(len(c) for c in inputdata)
         self.neuron = []
-        for p in input:
+        # print(f"list lengh is {len(self.neuron)}")
+        for p in inputdata:
             for t in p:
-                self.neuron.append(0)
-                x = threading.Thread(target=self.feedforward, args=(t, self.layer[nnposition], index, nnposition))
+                self.neuron.append(self.feedforward(t, self.layer[nnposition], index, nnposition))
+                # x = threading.Thread(target=self.feedforward, args=(t, self.layer[nnposition], index, nnposition))
                 index += 1
-                x.start()
-                threds.append(x)
+                # x.start()
+                # threds.append(x)
             nnposition += 1
-        for t in threds:
-            t.join()
+        # for t in threds:
+        #    t.join()
         newinput = np.empty(0)
         inputcounter = 0
-        for x in input:
-            temparray = np.empty(len(self.neuron[0]))
-            for t in range(inputcounter, len(x)):
-                temparray += self.neuron[t]
+        # del t, x
+        for x in inputdata:
+            temparray = np.zeros(self.layer[0][-1])
+            to = len(x)
+            for neuroncounter in range(inputcounter, to):
+                try:
+                    temparray = np.add(temparray, self.neuron[neuroncounter])
+                except Exception as e:
+                    print(e)
+                    print(f"this neuron{self.neuron} this tempattay {temparray} and the  {self.layer}")
             inputcounter += len(x) - 1
             newinput = np.concatenate((newinput, temparray))
         self.feedforward(newinput, self.layer[nnposition], 0, nnposition)
@@ -177,7 +188,8 @@ class CENDEDOBL:
         data = {"layer": self.layer,
                 'jumpingrate': self.jumpingrate,
                 "lowerbound": self.lowerbound,
-                "upperbound": self.upperbound
+                "upperbound": self.upperbound,
+                "interation": self.iteration
                 }
         nets = []
         performance = []
@@ -189,7 +201,7 @@ class CENDEDOBL:
         data["individuals"] = nets
         data["performance"] = performance
         data["boundries"] = boundries
-        with open(self.save + str(self.iteration)+".json", "w") as outfile:
+        with open(self.save + str(self.iteration) + ".json", "w") as outfile:
             json.dump(data, outfile)
         self.iteration += 1
 
@@ -199,6 +211,7 @@ class CENDEDOBL:
         self.jumpingrate = data['jumpingrate']
         self.lowerbound = data['lowerbound']
         self.upperbound = data['upperbound']
+        self.iteration = data['interation']
         performance = data["performance"]
         individual = data["individuals"]
         boundries = data["boundries"]
@@ -206,7 +219,8 @@ class CENDEDOBL:
 
         for x in range(len(individual)):
             self.populationsize.append(
-                NeuralNet(self.layer, np.array(individual[x]), upperbound=boundries[x][0], lowerbound=boundries[x][1], performance=performance[x]))
+                NeuralNet(self.layer, np.array(individual[x]), upperbound=boundries[x][0], lowerbound=boundries[x][1],
+                          performance=performance[x]))
 
     def lowerandupperbound(self):
         for x in self.populationsize:
@@ -218,11 +232,11 @@ class CENDEDOBL:
         self.lowerandupperbound()
         o_pop: List[NeuralNet] = []
         for x in self.populationsize:
-            o_pop.append(x.createoppositeindividual(self.lowerbound, self.upperbound))
+            o_pop.append(x.createoppositeindividual())
         self.findbestindividuals(o_pop)
 
     def sortfunc(self, neuralnet: NeuralNet):
-        return NeuralNet.getperformance(neuralnet)
+        return neuralnet.getperformance()
 
     def findbestindividuals(self, coparer: List[NeuralNet], onebyone=False):
         counter = 0
@@ -301,16 +315,18 @@ class CENDEDOBL:
         del self.populationsize[-1]
         time.sleep(1)
 
-    def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions):
-        print(len(self.populationsize[0].getencoded()))
+    def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions, first=True):
         self.findbestindividuals(self.populationsize)
-        print(len(self.populationsize[0].getencoded()))
+        # print(len(self.populationsize[0].getencoded()))
         self.obl()
-        print(len(self.populationsize[0].getencoded()))
+        # print(len(self.populationsize[0].getencoded()))
         while True:
-            self.lowerandupperbound()
             self.writedata()
-            self.manager.setshuffle()
+            if not first:
+                print("testig old stock")
+                self.manager.setshuffle()
+                self.findbestindividuals(self.populationsize)
+            first = False
             x1 = random.randint(0, len(self.populationsize) - 1)
             x2 = random.randint(0, len(self.populationsize) - 1)
             while x1 == x2:
@@ -335,12 +351,12 @@ class CENDEDOBL:
                 scaledpopulation.append(NeuralNet(self.layer, newencoded, self.upperbound, self.lowerbound))
             self.findbestindividuals(scaledpopulation, True)
             if random.random() < self.jumpingrate:
+                print("doing opposite")
                 self.obl()
             else:
+                print("doing centered")
                 self.lowerandupperbound()
-                t = NeuralNet(self.layer, upperbound=self.upperbound, lowerbound=self.lowerbound)
-                t.initvalues()
-                net = t.getencoded()
+                net = np.zeros(len(self.populationsize[0].getencoded()))
                 for i in range(bestsolutions):
                     net += self.populationsize[i].getencoded()
                 t = NeuralNet(self.layer, net / bestsolutions, upperbound=self.upperbound, lowerbound=self.lowerbound)
