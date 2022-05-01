@@ -8,6 +8,8 @@ import Manager
 import numpy as np
 import time
 
+def sortfunction(neuralnet: NeuralNetwork.NeuralNet):
+    return neuralnet.getperformance()
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     neuralnet = [[4, 3, 4], [4, 3, 4], [4, 3, 4], [12, 4, 3, 2]]
@@ -23,10 +25,16 @@ if __name__ == '__main__':
         neuro = NeuralNetwork.NeuralNet(neuralnet, upperbound=1, lowerbound=-1)
         neuro.initvalues()
         neuralneta.append(neuro)
+   # for i in neuralneta:
+   #     i.setperfromance(np.random.random())
+   #     print(i.getencoded())
+    #neuralneta.sort(key=sortfunction,reverse=True)
+    #for i in neuralneta:
+    #    print(i.getencoded())
     # t = neuralneta[0].createoppositeindividual(1,-1)
     # print(len(t.getencoded()))
-    cendobl = NeuralNetwork.CENDEDOBL(neuralneta, 0.3, 30, neuralnet, port, 15)
-    cendobl.readindata("./30.json")
+    cendobl = NeuralNetwork.CENDEDOBL(neuralneta, 0.3, 30, neuralnet, port, 15, save="./30popsize/")
+    #cendobl.readindata("./15popsize/10.json")
     cendobl.CenDEDOL(0.9, 0.5, 3)
     # time.sleep(30)
 # print("stopping")

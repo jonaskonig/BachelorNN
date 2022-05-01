@@ -46,7 +46,9 @@ class CommunicationManager:
         self.shuffle = True
 
     def getresults(self):
-        return self.results
+        res = self.results
+        self.results = None
+        return res
 
     def startcommunication(self):
         self.sender.start()

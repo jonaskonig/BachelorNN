@@ -103,7 +103,7 @@ class NeuralNet:
         for x in self.encodednet:
             value = random.uniform((self.upperbound + self.lowerbound) / 2, self.lowerbound + self.upperbound - x)
             oppositeencodednet = np.append(oppositeencodednet, value)
-        return NeuralNet(self.layer, oppositeencodednet, upperbound=self.lowerbound, lowerbound=self.lowerbound)
+        return NeuralNet(self.layer, oppositeencodednet)
 
     def feedforward(self, input, layer: List, index, offset=0):
         neuron = []
@@ -315,13 +315,14 @@ class CENDEDOBL:
         del self.populationsize[-1]
         time.sleep(1)
 
-    def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions, first=True):
+    def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions, first=True, newrun=True):
         self.findbestindividuals(self.populationsize)
         # print(len(self.populationsize[0].getencoded()))
         self.obl()
         # print(len(self.populationsize[0].getencoded()))
-        while True:
+        if newrun:
             self.writedata()
+        while True:
             if not first:
                 print("testig old stock")
                 self.manager.setshuffle()
@@ -344,7 +345,7 @@ class CENDEDOBL:
                 index = 0
                 for t in x.getencoded():
                     trand = random.random()
-                    if not trand < crossoverrate or trand == t:
+                    if not (trand < crossoverrate or trand == t):
                         newencoded[index] = t
                     index += 1
 
@@ -361,3 +362,4 @@ class CENDEDOBL:
                     net += self.populationsize[i].getencoded()
                 t = NeuralNet(self.layer, net / bestsolutions, upperbound=self.upperbound, lowerbound=self.lowerbound)
                 self.evaluateindividum(t)
+            self.writedata()
