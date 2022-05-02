@@ -238,7 +238,7 @@ class CENDEDOBL:
     def sortfunc(self, neuralnet: NeuralNet):
         return neuralnet.getperformance()
 
-    def findbestindividuals(self, coparer: List[NeuralNet], onebyone=False):
+    def findbestindividuals(self, coparer: List[NeuralNet], onebyone=False, testself=False):
         counter = 0
         while counter < len(coparer):
             startport = self.startport
@@ -276,9 +276,11 @@ class CENDEDOBL:
                 coparer[counter - res].setperfromance(results[x])
                 x += 1
         if onebyone:
-            for x in range(len(self.populationsize) - 1):
+            for x in range(len(self.populationsize)):
                 self.populationsize[x] = coparer[x] if coparer[x].getperformance() > self.populationsize[
                     x].getperformance() else self.populationsize[x]
+        elif testself:
+            self.populationsize.sort(key=self.sortfunc, reverse=True)
         else:
             print("comparing")
             orgleng = len(self.populationsize)
@@ -316,17 +318,18 @@ class CENDEDOBL:
         time.sleep(1)
 
     def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions, first=True, newrun=True):
-        self.findbestindividuals(self.populationsize)
+        self.findbestindividuals(self.populationsize, testself=True)
         # print(len(self.populationsize[0].getencoded()))
-        self.obl()
+
         # print(len(self.populationsize[0].getencoded()))
         if newrun:
+            self.obl()
             self.writedata()
         while True:
             if not first:
                 print("testig old stock")
                 self.manager.setshuffle()
-                self.findbestindividuals(self.populationsize)
+                self.findbestindividuals(self.populationsize, testself=True)
             first = False
             x1 = random.randint(0, len(self.populationsize) - 1)
             x2 = random.randint(0, len(self.populationsize) - 1)
