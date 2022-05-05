@@ -14,13 +14,17 @@ import Manager
 class NeuralNet:
     # initiallise a neural net. Layer beeing an array, where every position indicates how many neurons this layer has
     # the first and last position of the list are the input and output layers of the neural net
-    def __init__(self, layer: List[List], encodednet=np.empty(0), upperbound=1, lowerbound=-1, performance=None):
+    def __init__(self, layer: List[List], encodednet=np.empty(0), upperbound=1, lowerbound=-1, performance=None,
+                 elter=None, age=0):
+        if elter is None:
+            elter = []
         self.layer = layer
+        self.age = age
         self.Neuralnetlengh = self.caculatelnght()
         self.offset = self.calcoffset()
         self.performance = performance
         self.neuron = []
-
+        self.elter = elter
         self.encodednet = encodednet
         self.endsofnns = self.setends()
         if len(encodednet) > 0:
@@ -77,6 +81,12 @@ class NeuralNet:
     def getupperbound(self):
         return self.upperbound
 
+    def getage(self):
+        return self.age
+
+    def getelter(self):
+        return self.elter
+
     def getlowerbound(self):
         return self.lowerbound
 
@@ -98,12 +108,12 @@ class NeuralNet:
             out += input * bias
         return out
 
-    def createoppositeindividual(self):
+    def createoppositeindividual(self, pos, age):
         oppositeencodednet = np.empty(0)
         for x in self.encodednet:
             value = random.uniform((self.upperbound + self.lowerbound) / 2, self.lowerbound + self.upperbound - x)
             oppositeencodednet = np.append(oppositeencodednet, value)
-        return NeuralNet(self.layer, oppositeencodednet)
+        return NeuralNet(self.layer, oppositeencodednet, elter=[pos], age=age)
 
     def feedforward(self, input, layer: List, index, offset=0):
         neuron = []
@@ -125,11 +135,11 @@ class NeuralNet:
                     neuroncounter += 1
                     neuron.append(math.tanh(value + self.encodednet[biascounter]))
                     biascounter += 1
-        #try:
+        # try:
         return neuron[-layer[-1]:]
-        #except Exception as e:
+        # except Exception as e:
         #    print(e)
-         #   print(f"Index is: {index} and lenght is: {len(self.neuron)}")
+        #   print(f"Index is: {index} and lenght is: {len(self.neuron)}")
 
     def neuralnet(self, inputdata: List[List]):
         index = 0
@@ -169,6 +179,7 @@ class CENDEDOBL:
     def __init__(self, populationsize: List[NeuralNet], jumpingrate, runtime, layer, startport, chunksize,
                  save: str = "./",
                  address="127.0.0.1"):
+        self.manager = None
         self.populationsize = populationsize
         self.jumpingrate = jumpingrate
         self.lowerbound = 1
@@ -180,9 +191,14 @@ class CENDEDOBL:
         self.chunksize = chunksize
         self.iteration = 0
         self.address = address
+
+    def starmanger(self):
         self.manager = Manager.CommunicationManager(self.startport, self.address, self.chunksize)
         self.manager.setshuffle()
         self.startport += 4
+
+    def getpop(self):
+        return self.populationsize
 
     def writedata(self):
         data = {"layer": self.layer,
@@ -194,16 +210,24 @@ class CENDEDOBL:
         nets = []
         performance = []
         boundries = []
+        elter = []
+        age = []
         for x in self.populationsize:
             nets.append(x.getencoded().tolist())
             performance.append(x.getperformance())
             boundries.append([x.getupperbound(), x.getlowerbound()])
+            elter.append(x.getelter())
+            age.append(x.getage())
         data["individuals"] = nets
         data["performance"] = performance
         data["boundries"] = boundries
+        data["elter"] = elter
+        data["age"] = age
         with open(self.save + str(self.iteration) + ".json", "w") as outfile:
             json.dump(data, outfile)
         self.iteration += 1
+        if self.iteration == 50:
+            self.runtime += 10
 
     def readindata(self, filename: str):
         data = json.load(open(filename))
@@ -215,12 +239,27 @@ class CENDEDOBL:
         performance = data["performance"]
         individual = data["individuals"]
         boundries = data["boundries"]
-        self.populationsize = []
+        try:
+            elter = data["elter"]
 
+        except:
+            elter = [None] * len(individual)
+        try:
+            age = data["age"]
+        except:
+            age = [0] * len(individual)
+        self.populationsize = []
         for x in range(len(individual)):
             self.populationsize.append(
                 NeuralNet(self.layer, np.array(individual[x]), upperbound=boundries[x][0], lowerbound=boundries[x][1],
-                          performance=performance[x]))
+                          performance=performance[x], elter=elter[x], age=age[x]))
+        self.iteration += 1
+       # if self.iteration > 50:
+        #    self.runtime += 10
+        #if self.iteration > 84:
+        #    self.runtime += 10
+        #if self.iteration > 100:
+        #    self.runtime += 10
 
     def lowerandupperbound(self):
         for x in self.populationsize:
@@ -231,8 +270,10 @@ class CENDEDOBL:
     def obl(self):
         self.lowerandupperbound()
         o_pop: List[NeuralNet] = []
+        i = 0
         for x in self.populationsize:
-            o_pop.append(x.createoppositeindividual())
+            o_pop.append(x.createoppositeindividual(i, self.iteration))
+            i += 1
         self.findbestindividuals(o_pop)
 
     def sortfunc(self, neuralnet: NeuralNet):
@@ -318,10 +359,9 @@ class CENDEDOBL:
         time.sleep(1)
 
     def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions, first=True, newrun=True):
+        # print(len(self.populationsize[0].getencoded()))
+        # print(len(self.populationsize[0].getencoded()))
         self.findbestindividuals(self.populationsize, testself=True)
-        # print(len(self.populationsize[0].getencoded()))
-
-        # print(len(self.populationsize[0].getencoded()))
         if newrun:
             self.obl()
             self.writedata()
@@ -352,7 +392,9 @@ class CENDEDOBL:
                         newencoded[index] = t
                     index += 1
 
-                scaledpopulation.append(NeuralNet(self.layer, newencoded, self.upperbound, self.lowerbound))
+                scaledpopulation.append(
+                    NeuralNet(self.layer, newencoded, self.upperbound, self.lowerbound,
+                              elter=[0, x1, x2, self.populationsize.index(x)], age=self.iteration))
             self.findbestindividuals(scaledpopulation, True)
             if random.random() < self.jumpingrate:
                 print("doing opposite")
@@ -363,6 +405,7 @@ class CENDEDOBL:
                 net = np.zeros(len(self.populationsize[0].getencoded()))
                 for i in range(bestsolutions):
                     net += self.populationsize[i].getencoded()
-                t = NeuralNet(self.layer, net / bestsolutions, upperbound=self.upperbound, lowerbound=self.lowerbound)
+                t = NeuralNet(self.layer, net / bestsolutions, upperbound=self.upperbound, lowerbound=self.lowerbound,
+                              elter=[0, 1, 2], age=self.iteration)
                 self.evaluateindividum(t)
             self.writedata()
