@@ -226,8 +226,8 @@ class CENDEDOBL:
         with open(self.save + str(self.iteration) + ".json", "w") as outfile:
             json.dump(data, outfile)
         self.iteration += 1
-        if self.iteration == 50:
-            self.runtime += 10
+        # if self.iteration == 50:
+        #    self.runtime += 10
 
     def readindata(self, filename: str):
         data = json.load(open(filename))
@@ -254,12 +254,13 @@ class CENDEDOBL:
                 NeuralNet(self.layer, np.array(individual[x]), upperbound=boundries[x][0], lowerbound=boundries[x][1],
                           performance=performance[x], elter=elter[x], age=age[x]))
         self.iteration += 1
-       # if self.iteration > 50:
-        #    self.runtime += 10
-        #if self.iteration > 84:
-        #    self.runtime += 10
-        #if self.iteration > 100:
-        #    self.runtime += 10
+
+    # if self.iteration > 50:
+    #    self.runtime += 10
+    # if self.iteration > 84:
+    #    self.runtime += 10
+    # if self.iteration > 100:
+    #    self.runtime += 10
 
     def lowerandupperbound(self):
         for x in self.populationsize:
@@ -278,6 +279,49 @@ class CENDEDOBL:
 
     def sortfunc(self, neuralnet: NeuralNet):
         return neuralnet.getperformance()
+
+    def benchmark(self, rounds: int):
+
+        finresult = []
+        for kk in range(rounds):
+            counter = 0
+            print(len(self.populationsize))
+            roundresult = []
+            while counter < len(self.populationsize):
+                startport = self.startport
+                currentactiveingame = []
+                if len(self.populationsize) - counter > self.chunksize:
+                    self.manager.setbotcount(self.chunksize)
+                    self.manager.setstart()
+                    for x in range(self.chunksize):
+                        currentactiveingame.append(
+                            Communicator.Communicator(startport, self.address, self.populationsize[counter]))
+                        counter += 1
+                        startport += 4
+                else:
+                    self.manager.setbotcount(len(self.populationsize) - counter)
+                    self.manager.setstart()
+                    for x in range(len(self.populationsize) - counter):
+                        currentactiveingame.append(
+                            Communicator.Communicator(startport, self.address, self.populationsize[counter]))
+                        counter += 1
+                        startport += 4
+                time.sleep(self.runtime)
+                self.manager.setstop()
+                print("setstop")
+                for active in currentactiveingame:
+                    active.setstoprunning()
+                for active in currentactiveingame:
+                    active.stopthread()
+                results = self.manager.getresults()
+                while results is None:
+                    #     self.manager.askforresult()
+                    print("Waitingforresults")
+                    #    time.sleep(1)
+                    results = self.manager.getresults()
+                roundresult.extend(results)
+            finresult.append(roundresult)
+        return finresult
 
     def findbestindividuals(self, coparer: List[NeuralNet], onebyone=False, testself=False):
         counter = 0
@@ -357,6 +401,43 @@ class CENDEDOBL:
         self.populationsize.sort(key=self.sortfunc, reverse=True)
         del self.populationsize[-1]
         time.sleep(1)
+
+    def DE(self, crossoverrate, scalingfactor: float, first=True, newrun=True):
+        self.findbestindividuals(self.populationsize, testself=True)
+        if newrun:
+            self.writedata()
+        while True:
+            if not first:
+                print("testig old stock")
+                self.manager.setshuffle()
+                self.findbestindividuals(self.populationsize, testself=True)
+            first = False
+            x1 = random.randint(0, len(self.populationsize) - 1)
+            x2 = random.randint(0, len(self.populationsize) - 1)
+            while x1 == x2:
+                x1 = random.randint(0, len(self.populationsize) - 1)
+                x2 = random.randint(0, len(self.populationsize) - 1)
+            scaledpopulation: List[NeuralNet] = []
+            self.lowerandupperbound()
+            for x in self.populationsize:
+                scal1 = (scalingfactor * (
+                        self.populationsize[0].getencoded() - x.getencoded()))
+                scal2 = (scalingfactor * (
+                        self.populationsize[x1].getencoded() - self.populationsize[x2].getencoded()))
+                newencoded = x.getencoded() + scal1 + scal2
+
+                index = 0
+                for t in x.getencoded():
+                    trand = random.random()
+                    if not (trand < crossoverrate or trand == t):
+                        newencoded[index] = t
+                    index += 1
+
+                scaledpopulation.append(
+                    NeuralNet(self.layer, newencoded, self.upperbound, self.lowerbound,
+                              elter=[0, x1, x2, self.populationsize.index(x)], age=self.iteration))
+            self.findbestindividuals(scaledpopulation, True)
+            self.writedata()
 
     def CenDEDOL(self, crossoverrate, scalingfactor: float, bestsolutions, first=True, newrun=True):
         # print(len(self.populationsize[0].getencoded()))

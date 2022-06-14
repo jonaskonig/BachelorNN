@@ -75,8 +75,10 @@ class Communicator:
         upper_bande = np.array([60, 202, 165])
         bande = cv2.inRange(hsv, lower_band, upper_bande)
         ret, bande_img = cv2.threshold(bande, 70, 255, cv2.THRESH_BINARY)
-        lower_red = np.array([0, 0, 125])
-        upper_red = np.array([179, 242, 131])
+        #lower_red = np.array([0, 0, 125])
+        #upper_red = np.array([179, 242, 131])
+        lower_red = np.array([4, 0, 19])
+        upper_red = np.array([136, 234, 205])
         red = cv2.inRange(hsv, lower_red, upper_red)
         ret, red_img = cv2.threshold(red, 70, 255, cv2.THRESH_BINARY)
         upper_blue = np.array([114, 231, 138], np.uint8)
@@ -84,7 +86,7 @@ class Communicator:
         blue = cv2.inRange(hsv, lower_blue, upper_blue)
         ret, blue_img = cv2.threshold(blue, 70, 255, cv2.THRESH_BINARY)
         contours_blue, _ = cv2.findContours(blue_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contours_red, _ = cv2.findContours(red_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_red, _ = cv2.findContours(cv2.bitwise_not(red_img), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contours_bande, _ = cv2.findContours(bande_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         redreq = []
         bluereg = []

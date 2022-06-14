@@ -2,6 +2,8 @@
 
 # Press ⌃R to execute it or replace it with your code.
 # Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import csv
+
 import NeuralNetwork
 import Communicator
 import Manager
@@ -15,9 +17,10 @@ def sortfunction(neuralnet: NeuralNetwork.NeuralNet):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    neuralnet = [[4, 3, 4], [4, 3, 4], [4, 3, 4], [12, 4, 3, 2]]
+    neuralnet = [[4, 3, 4], [4, 3, 4], [4, 3, 4], [12, 4, 3,2]]
+    #neuralnet = [[4, 3, 4], [4, 3, 4], [4, 3, 4], [12,4, 2]]
     neuralneta = []
-    botsize = 60
+    botsize = 30
     port = 9653
     # mana = Manager.CommunicationManager(port, "127.0.0.1", botsize)
     # port += 4
@@ -38,21 +41,27 @@ if __name__ == '__main__':
     #    print(i.getencoded())
     # t = neuralneta[0].createoppositeindividual(1,-1)
     # print(len(t.getencoded()))
-    cendobl = NeuralNetwork.CENDEDOBL(neuralneta, 0.3, 40, neuralnet, port, 15, save="./60popsize/")
+    cendobl = NeuralNetwork.CENDEDOBL(neuralneta, 0.3, 30, neuralnet, port, 15,
+                                      save="/Users/jona/Documents/studium/bachelor/BachelorRawData/30popnn/")
     cendobl.starmanger()
-    cendobl.readindata("./60popsize/91.json")
-    cendobl.CenDEDOL(0.9, 0.5, 3, newrun=False)
+    cendobl.readindata("/Users/jona/Documents/studium/bachelor/BachelorRawData/30popnn/100.json")
+    res = cendobl.benchmark(3)
+    with open('sample30.csv', 'w') as f:
+        mywriter = csv.writer(f, delimiter=',')
+        mywriter.writerows(res)
+        #cendobl.CenDEDOL(0.9, 0.5, 3)
+    #cendobl.DE(0.9, 0.5, newrun=False)
     #cendobl.readindata("./30popsize/57.json")
-    ##t = cendobl.getpop()
+    #t = cendobl.getpop()
     #mana = Manager.CommunicationManager(port, "127.0.0.1", 1)
     #port += 4
     #mana.setshuffle()
     #mana.setstart()
     #commm = Communicator.Communicator(port, "127.0.0.1", t[0])
-    #time.sleep(30)
-    #mana.setstop()
-    #commm.setstoprunning()
-    #commm.stopthread()
+    # time.sleep(30)
+    # mana.setstop()
+    # commm.setstoprunning()
+    # commm.stopthread()
 
     # cendobl.CenDEDOL(0.9, 0.5, 3)
     # time.sleep(30)
