@@ -171,8 +171,8 @@ class NeuralNet:
                     print(f"this neuron{self.neuron} this tempattay {temparray} and the  {self.layer}")
             inputcounter += len(x) - 1
             newinput = np.concatenate((newinput, temparray))
-        self.feedforward(newinput, self.layer[nnposition], 0, nnposition)
-        return self.neuron[0]
+        out = self.feedforward(newinput, self.layer[nnposition], 0, nnposition)
+        return out
 
 
 class CENDEDOBL:
